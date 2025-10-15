@@ -3,7 +3,7 @@ import { useSwap } from '@/hooks/use-swap'
 import { formatAddress } from '@/lib/format'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { RefreshCw, Wallet } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import TokenInput from './token-input'
 import TokenSelectorModal from './token-selector-modal'
@@ -23,6 +23,7 @@ const Swap = () => {
 
   const [isModalOpenSell, setIsModalOpenSell] = useState(false)
   const [isModalOpenBuy, setIsModalOpenBuy] = useState(false)
+  
   const {
     change,
     isAuthorized,
@@ -52,56 +53,78 @@ const Swap = () => {
     isEncryptingB,
   } = useBalance()
 
+  // Memoized handlers to prevent unnecessary re-renders
+  const handleModalOpenSell = useCallback(() => setIsModalOpenSell(true), [])
+  const handleModalOpenBuy = useCallback(() => setIsModalOpenBuy(true), [])
+  const handleModalCloseSell = useCallback(() => setIsModalOpenSell(false), [])
+  const handleModalCloseBuy = useCallback(() => setIsModalOpenBuy(false), [])
+
+  // Memoized balance data
+  const inputBalance = useMemo(() => {
+    return inputToken.ticker === 'TokenA' ? balanceA : balanceB
+  }, [inputToken.ticker, balanceA, balanceB])
+
+  const outputBalance = useMemo(() => {
+    return outputToken.ticker === 'TokenA' ? balanceA : balanceB
+  }, [outputToken.ticker, balanceA, balanceB])
+
+  const inputEncryptedBalance = useMemo(() => {
+    return encryptedBalance?.[inputToken.ticker as 'TokenA' | 'TokenB'] || ''
+  }, [encryptedBalance, inputToken.ticker])
+
+  const outputEncryptedBalance = useMemo(() => {
+    return encryptedBalance?.[outputToken.ticker as 'TokenA' | 'TokenB'] || ''
+  }, [encryptedBalance, outputToken.ticker])
+
+  // Memoized decrypt handlers
+  const handleDecryptInputBalance = useCallback(() => {
+    if (inputToken.ticker === 'TokenA') {
+      decryptBalanceA()
+    } else {
+      decryptBalanceB()
+    }
+  }, [inputToken.ticker, decryptBalanceA, decryptBalanceB])
+
+  const handleDecryptOutputBalance = useCallback(() => {
+    if (outputToken.ticker === 'TokenA') {
+      decryptBalanceA()
+    } else {
+      decryptBalanceB()
+    }
+  }, [outputToken.ticker, decryptBalanceA, decryptBalanceB])
+
   return (
     <div className='px-10'>
       <div className='space-y-5 relative'>
         <TokenInput
           type='sell'
-          openModal={() => setIsModalOpenSell(true)}
+          openModal={handleModalOpenSell}
           disabledInput={inputToken.address === ''}
           onSelectToken={setInputToken}
           token={inputToken}
           value={inputAmount}
-          onChange={value => setInputAmount(value)}
+          onChange={setInputAmount}
           wallet={
             <div className='self-end flex items-center gap-2'>
               <Wallet />
               <Dialog>
                 <DialogTrigger asChild>
                   <span className='cursor-pointer hover:text-primary transition-colors duration-200'>
-                    {formatAddress(
-                      encryptedBalance?.[
-                        inputToken.ticker as 'TokenA' | 'TokenB'
-                      ] || ''
-                    )}
+                    {formatAddress(inputEncryptedBalance)}
                   </span>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Balance</DialogTitle>
                     <DialogDescription className='text-xl break-all'>
-                      {(inputToken.ticker === 'TokenA' ? balanceA : balanceB) ||
-                        encryptedBalance?.[
-                          inputToken.ticker as 'TokenA' | 'TokenB'
-                        ]}
+                      {inputBalance || inputEncryptedBalance}
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
                     <Button
                       className='bg-amber-500 text-white text-xl'
-                      onClick={() => {
-                        if (inputToken.ticker === 'TokenA') {
-                          decryptBalanceA()
-                        } else {
-                          decryptBalanceB()
-                        }
-                      }}
-                      disabled={
-                        isEncryptingA ||
-                        !encryptedBalance?.[
-                          inputToken.ticker as 'TokenA' | 'TokenB'
-                        ]
-                      }
+                      onClick={handleDecryptInputBalance}
+                      disabled={isEncryptingA || !inputEncryptedBalance}
                     >
                       {isEncryptingA ? 'Encrypting...' : 'Encrypt'}
                     </Button>
@@ -110,11 +133,11 @@ const Swap = () => {
               </Dialog>
             </div>
           }
-        ></TokenInput>
+        />
         <TokenInput
           disabledInput
           type='buy'
-          openModal={() => setIsModalOpenBuy(true)}
+          openModal={handleModalOpenBuy}
           token={outputToken}
           onSelectToken={setOutputToken}
           output={{
@@ -131,41 +154,21 @@ const Swap = () => {
               <Dialog>
                 <DialogTrigger asChild>
                   <span className='cursor-pointer hover:text-primary transition-colors duration-200'>
-                    {formatAddress(
-                      encryptedBalance?.[
-                        outputToken.ticker as 'TokenA' | 'TokenB'
-                      ]
-                    )}
+                    {formatAddress(outputEncryptedBalance)}
                   </span>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Balance</DialogTitle>
                     <DialogDescription className='text-xl break-all'>
-                      {(outputToken.ticker === 'TokenA'
-                        ? balanceA
-                        : balanceB) ||
-                        encryptedBalance?.[
-                          outputToken.ticker as 'TokenA' | 'TokenB'
-                        ]}
+                      {outputBalance || outputEncryptedBalance}
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
                     <Button
                       className='bg-amber-500 text-white text-xl'
-                      onClick={() => {
-                        if (outputToken.ticker === 'TokenA') {
-                          decryptBalanceA()
-                        } else {
-                          decryptBalanceB()
-                        }
-                      }}
-                      disabled={
-                        isEncryptingB ||
-                        !encryptedBalance?.[
-                          outputToken.ticker as 'TokenA' | 'TokenB'
-                        ]
-                      }
+                      onClick={handleDecryptOutputBalance}
+                      disabled={isEncryptingB || !outputEncryptedBalance}
                     >
                       {isEncryptingB ? 'Encrypting...' : 'Encrypt'}
                     </Button>
@@ -174,7 +177,7 @@ const Swap = () => {
               </Dialog>
             </div>
           }
-        ></TokenInput>
+        />
         <div className='absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2'>
           <div className='relative'>
             <Button
@@ -187,7 +190,7 @@ const Swap = () => {
         </div>
       </div>
       <TokenSelectorModal
-        type={'sell'}
+        type='sell'
         isOpen={isModalOpenSell}
         setIsOpen={setIsModalOpenSell}
         setToken={setInputToken}
@@ -196,7 +199,7 @@ const Swap = () => {
       />
 
       <TokenSelectorModal
-        type={'buy'}
+        type='buy'
         isOpen={isModalOpenBuy}
         setIsOpen={setIsModalOpenBuy}
         setToken={setOutputToken}
@@ -204,33 +207,29 @@ const Swap = () => {
         outputToken={outputToken}
       />
       <div className='flex justify-center items-center'>
-        {isConnected ? (
-          isAuthorized ? (
-            isCalculate ? (
-              <Button
-                className='w-full rounded-full h-14 mt-2 text-xl'
-                onClick={() => swap()}
-              >
-                Swap
-              </Button>
-            ) : (
-              <Button
-                className='w-full rounded-full h-14 mt-2 text-xl'
-                onClick={() => decryptAlgo()}
-              >
-                Calculate the purchase(Two Signatures)
-              </Button>
-            )
-          ) : (
-            <Button
-              className='w-full rounded-full h-14 mt-2 text-xl'
-              onClick={() => authorize()}
-            >
-              Authorize {inputToken.ticker || '--'} & Calculate the sale
-            </Button>
-          )
-        ) : (
+        {!isConnected ? (
           <ConnectButton />
+        ) : !isAuthorized ? (
+          <Button
+            className='w-full rounded-full h-14 mt-2 text-xl'
+            onClick={authorize}
+          >
+            Authorize {inputToken.ticker || '--'} & Calculate the sale
+          </Button>
+        ) : !isCalculate ? (
+          <Button
+            className='w-full rounded-full h-14 mt-2 text-xl'
+            onClick={decryptAlgo}
+          >
+            Calculate the purchase (Two Signatures)
+          </Button>
+        ) : (
+          <Button
+            className='w-full rounded-full h-14 mt-2 text-xl'
+            onClick={swap}
+          >
+            Swap
+          </Button>
         )}
       </div>
     </div>

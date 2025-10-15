@@ -1,5 +1,5 @@
 import { Camera, Geometry, Mesh, Program, Renderer } from 'ogl'
-import React, { useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 
 interface ParticlesProps {
   particleCount?: number
@@ -108,6 +108,27 @@ const Particles: React.FC<ParticlesProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const mouseRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const animationFrameRef = useRef<number>()
+
+  // Memoized mouse move handler
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!containerRef.current) return
+    
+    const rect = containerRef.current.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+    const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1)
+    mouseRef.current = { x, y }
+  }, [])
+
+  // Memoized resize handler
+  const handleResize = useCallback((renderer: Renderer, camera: Camera, gl: WebGLRenderingContext) => {
+    if (!containerRef.current) return
+    
+    const width = containerRef.current.clientWidth
+    const height = containerRef.current.clientHeight
+    renderer.setSize(width, height)
+    camera.perspective({ aspect: gl.canvas.width / gl.canvas.height })
+  }, [])
 
   useEffect(() => {
     const container = containerRef.current
@@ -121,21 +142,9 @@ const Particles: React.FC<ParticlesProps> = ({
     const camera = new Camera(gl, { fov: 15 })
     camera.position.set(0, 0, cameraDistance)
 
-    const resize = () => {
-      const width = container.clientWidth
-      const height = container.clientHeight
-      renderer.setSize(width, height)
-      camera.perspective({ aspect: gl.canvas.width / gl.canvas.height })
-    }
+    const resize = () => handleResize(renderer, camera, gl)
     window.addEventListener('resize', resize, false)
     resize()
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = container.getBoundingClientRect()
-      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1
-      const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1)
-      mouseRef.current = { x, y }
-    }
 
     if (moveParticlesOnHover) {
       container.addEventListener('mousemove', handleMouseMove)
@@ -190,12 +199,11 @@ const Particles: React.FC<ParticlesProps> = ({
 
     const particles = new Mesh(gl, { mode: gl.POINTS, geometry, program })
 
-    let animationFrameId: number
     let lastTime = performance.now()
     let elapsed = 0
 
     const update = (t: number) => {
-      animationFrameId = requestAnimationFrame(update)
+      animationFrameRef.current = requestAnimationFrame(update)
       const delta = t - lastTime
       lastTime = t
       elapsed += delta * speed
@@ -219,14 +227,16 @@ const Particles: React.FC<ParticlesProps> = ({
       renderer.render({ scene: particles, camera })
     }
 
-    animationFrameId = requestAnimationFrame(update)
+    animationFrameRef.current = requestAnimationFrame(update)
 
     return () => {
       window.removeEventListener('resize', resize)
       if (moveParticlesOnHover) {
         container.removeEventListener('mousemove', handleMouseMove)
       }
-      cancelAnimationFrame(animationFrameId)
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
       if (container.contains(gl.canvas)) {
         container.removeChild(gl.canvas)
       }
@@ -242,6 +252,8 @@ const Particles: React.FC<ParticlesProps> = ({
     sizeRandomness,
     cameraDistance,
     disableRotation,
+    handleMouseMove,
+    handleResize,
   ])
 
   return (

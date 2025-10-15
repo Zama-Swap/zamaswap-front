@@ -12,6 +12,7 @@ import type { TokenData } from '@/hooks/use-swap'
 import { formatAddress } from '@/lib/format'
 import { Search } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 interface TokenSelectorModalProps {
@@ -31,12 +32,24 @@ export default function TokenSelectorModal({
   inputToken,
   outputToken,
 }: TokenSelectorModalProps) {
-  const handleTokenClick = (selectedToken: (typeof TOKENS)[number]) => {
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // Memoized filtered tokens
+  const filteredTokens = useMemo(() => {
+    if (!searchTerm) return TOKENS
+    
+    return TOKENS.filter(token =>
+      token.ticker.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      token.address.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [searchTerm])
+
+  const handleTokenClick = useCallback((selectedToken: (typeof TOKENS)[number]) => {
     if (
       selectedToken.address === inputToken.address ||
       selectedToken.address === outputToken.address
     ) {
-      toast.error('You cannot selected the same token')
+      toast.error('You cannot select the same token')
       return
     }
 
@@ -45,7 +58,11 @@ export default function TokenSelectorModal({
       ticker: selectedToken.ticker,
     })
     setIsOpen(false)
-  }
+  }, [inputToken.address, outputToken.address, setToken, setIsOpen])
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value)
+  }, [])
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -62,29 +79,37 @@ export default function TokenSelectorModal({
               <Input
                 placeholder='Search for Tokens'
                 className='w-full rounded-full border-gray-700 bg-gray-800 py-5 pl-10 focus:outline-none !focus:ring-0'
+                value={searchTerm}
+                onChange={handleSearchChange}
               />
             </div>
           </div>
           <ScrollArea className='h-[300px]'>
             <div className='flex flex-col'>
-              {TOKENS.map(token => (
-                <button
-                  key={token.ticker}
-                  className='flex items-center rounded-lg gap-3 px-4 py-3 text-left hover:bg-gray-800 text-base'
-                  onClick={() => handleTokenClick(token)}
-                >
-                  <div className='flex-grow'>
-                    <p className='text-lg'>{token.ticker}</p>
-                    <p className='text-md text-gray-400'>
-                      {token.address && (
-                        <span className='ml-2'>
-                          address: {formatAddress(token.address)}
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {filteredTokens.length > 0 ? (
+                filteredTokens.map(token => (
+                  <button
+                    key={token.ticker}
+                    className='flex items-center rounded-lg gap-3 px-4 py-3 text-left hover:bg-gray-800 text-base transition-colors duration-200'
+                    onClick={() => handleTokenClick(token)}
+                  >
+                    <div className='flex-grow'>
+                      <p className='text-lg'>{token.ticker}</p>
+                      <p className='text-md text-gray-400'>
+                        {token.address && (
+                          <span className='ml-2'>
+                            address: {formatAddress(token.address)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className='flex items-center justify-center py-8 text-gray-400'>
+                  <p>No tokens found</p>
+                </div>
+              )}
             </div>
           </ScrollArea>
         </div>

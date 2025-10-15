@@ -2,7 +2,7 @@ import { useFheEncrypt } from '@/hooks/use-fhe-encrypt'
 import { useLiquidity } from '@/hooks/use-liquidity'
 import { usePermission } from '@/hooks/use-permission'
 import { fheSwapAddress } from '@/lib/contract'
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useAccount } from 'wagmi'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -10,12 +10,10 @@ import { Input } from './ui/input'
 const AddLiquidity = () => {
   const [tokenAAmount, setTokenAAmount] = useState('100')
   const [tokenBAmount, setTokenBAmount] = useState('50')
-
   const [lpAmount, setLpAmount] = useState('20')
 
   const { address } = useAccount()
-  const { permissionStatus, setPermission, isSettingPermission } =
-    usePermission()
+  const { permissionStatus, setPermission, isSettingPermission } = usePermission()
 
   const {
     data: encryptedTokenA,
@@ -40,6 +38,52 @@ const AddLiquidity = () => {
     removeLiquidity,
     isRemovingLiquidity,
   } = useLiquidity()
+
+  // Memoized handlers
+  const handleEncryptTokens = useCallback(() => {
+    if (!address) return
+    
+    encryptTokenA({
+      userAddress: address as `0x${string}`,
+      contractAddress: fheSwapAddress,
+      amount: tokenAAmount,
+    })
+    encryptTokenB({
+      userAddress: address as `0x${string}`,
+      contractAddress: fheSwapAddress,
+      amount: tokenBAmount,
+    })
+  }, [address, encryptTokenA, encryptTokenB, tokenAAmount, tokenBAmount])
+
+  const handleAddLiquidity = useCallback(() => {
+    if (!encryptedTokenA || !encryptedTokenB) return
+    
+    addLiquidity({
+      encryptedTokenA,
+      encryptedTokenB,
+    })
+  }, [addLiquidity, encryptedTokenA, encryptedTokenB])
+
+  const handleEncryptLpAmount = useCallback(() => {
+    if (!address) return
+    
+    encryptLpAmount({
+      userAddress: address as `0x${string}`,
+      contractAddress: fheSwapAddress,
+      amount: lpAmount,
+    })
+  }, [address, encryptLpAmount, lpAmount])
+
+  const handleRemoveLiquidity = useCallback(() => {
+    if (!encryptedLpAmount) return
+    
+    removeLiquidity(encryptedLpAmount)
+  }, [removeLiquidity, encryptedLpAmount])
+
+  // Memoized computed values
+  const isEncryptingTokens = isEncryptingTokenA || isEncryptingTokenB
+  const canAddLiquidity = !isAddingLiquidity && encryptedTokenA && encryptedTokenB
+  const canRemoveLiquidity = !isRemovingLiquidity && encryptedLpAmount
 
   if (!permissionStatus) {
     return (
@@ -97,35 +141,17 @@ const AddLiquidity = () => {
             </div>
           </div>
           <Button
-            disabled={isEncryptingTokenA || isEncryptingTokenB}
-            className='w-full bg-amber-500  text-white rounded-md h-12'
-            onClick={() => {
-              encryptTokenA({
-                userAddress: address as `0x${string}`,
-                contractAddress: fheSwapAddress,
-                amount: tokenAAmount,
-              })
-              encryptTokenB({
-                userAddress: address as `0x${string}`,
-                contractAddress: fheSwapAddress,
-                amount: tokenBAmount,
-              })
-            }}
+            disabled={isEncryptingTokens}
+            className='w-full bg-amber-500 text-white rounded-md h-12'
+            onClick={handleEncryptTokens}
           >
             ENCRYPT TokenA & TokenB
           </Button>
           <div className='flex flex-row gap-2 justify-between items-center w-full'>
             <Button
-              disabled={
-                isAddingLiquidity || !encryptedTokenA || !encryptedTokenB
-              }
-              className='w-full bg-blue-500  text-white rounded-md h-12'
-              onClick={() => {
-                addLiquidity({
-                  encryptedTokenA: encryptedTokenA!,
-                  encryptedTokenB: encryptedTokenB!,
-                })
-              }}
+              disabled={!canAddLiquidity}
+              className='w-full bg-blue-500 text-white rounded-md h-12'
+              onClick={handleAddLiquidity}
             >
               Add Liquidity
             </Button>
@@ -146,23 +172,15 @@ const AddLiquidity = () => {
           </div>
           <Button
             disabled={isEncryptingLpAmount}
-            className='w-full bg-amber-500  text-white rounded-md h-12'
-            onClick={() => {
-              encryptLpAmount({
-                userAddress: address as `0x${string}`,
-                contractAddress: fheSwapAddress,
-                amount: lpAmount,
-              })
-            }}
+            className='w-full bg-amber-500 text-white rounded-md h-12'
+            onClick={handleEncryptLpAmount}
           >
             ENCRYPT LP Amount
           </Button>
           <Button
-            disabled={isRemovingLiquidity || !encryptedLpAmount}
+            disabled={!canRemoveLiquidity}
             className='w-full bg-red-500 text-white rounded-md h-12'
-            onClick={() => {
-              removeLiquidity(encryptedLpAmount!)
-            }}
+            onClick={handleRemoveLiquidity}
           >
             Remove Liquidity
           </Button>

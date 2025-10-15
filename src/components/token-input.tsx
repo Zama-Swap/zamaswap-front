@@ -3,7 +3,7 @@
 import type { TokenData } from '@/hooks/use-swap'
 import { cn } from '@/lib/utils'
 import { ChevronDown, Eye, EyeClosed, X } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Button } from './ui/button'
 
 interface TokenInputProps {
@@ -49,6 +49,19 @@ export default function TokenInput({
 }: TokenInputProps) {
   const [isShowOutput, setIsShowOutput] = useState(false)
 
+  // Memoized handlers
+  const handleToggleOutput = useCallback(() => {
+    setIsShowOutput(prev => !prev)
+  }, [])
+
+  const handleClearToken = useCallback(() => {
+    onSelectToken?.({ ticker: '', address: '' })
+  }, [onSelectToken])
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange?.(e.target.value)
+  }, [onChange])
+
   return (
     <div
       className={cn(
@@ -76,7 +89,7 @@ export default function TokenInput({
                   size='icon'
                   variant='outline'
                   className='bg-secondary-foreground text-black'
-                  onClick={() => setIsShowOutput(!isShowOutput)}
+                  onClick={handleToggleOutput}
                 >
                   {isShowOutput ? <Eye /> : <EyeClosed />}
                 </Button>
@@ -88,9 +101,7 @@ export default function TokenInput({
               placeholder='0'
               value={value}
               disabled={disabledInput}
-              onChange={e => {
-                onChange?.(e.target.value)
-              }}
+              onChange={handleInputChange}
             />
           )}
           <div>{inputRight}</div>
@@ -125,20 +136,16 @@ export default function TokenInput({
         {token?.ticker ? (
           <Button
             size='icon'
-            onClick={() => {
-              onSelectToken?.({ ticker: '', address: '' })
-            }}
+            onClick={handleClearToken}
           >
             <X className='size-5' />
           </Button>
         ) : (
           <Button
-            onClick={() => {
-              openModal()
-            }}
+            onClick={openModal}
             size='icon'
           >
-            <ChevronDown className='size-5 ' />
+            <ChevronDown className='size-5' />
           </Button>
         )}
       </div>

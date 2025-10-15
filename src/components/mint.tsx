@@ -3,7 +3,7 @@ import { useFheEncrypt } from '@/hooks/use-fhe-encrypt'
 import { tokenAAddress, tokenBAddress } from '@/lib/contract'
 import { showEtherscanTx } from '@/lib/etherscan'
 import { formatAddress } from '@/lib/format'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { useAccount } from 'wagmi'
 import { Button } from './ui/button'
@@ -27,7 +27,7 @@ const Mint = () => {
     isPending: isEncryptingB,
   } = useFheEncrypt('tokenB')
 
-  const handleMintTokenA = async () => {
+  const handleMintTokenA = useCallback(async () => {
     if (!encryptedTokenA) {
       toast.error('Please encrypt tokenA first')
       return
@@ -36,16 +36,19 @@ const Mint = () => {
     try {
       const tx = await tokenAContract?.mint(
         address,
-        encryptedTokenA?.encryptedValue,
-        encryptedTokenA?.proof
+        encryptedTokenA.encryptedValue,
+        encryptedTokenA.proof
       )
-      showEtherscanTx('mint TokenA', tx.hash)
+      if (tx?.hash) {
+        showEtherscanTx('mint TokenA', tx.hash)
+      }
     } catch (error) {
-      toast.error('mint error')
+      console.error('Mint TokenA error:', error)
+      toast.error('Mint TokenA failed')
     }
-  }
+  }, [encryptedTokenA, tokenAContract, address])
 
-  const handleMintTokenB = async () => {
+  const handleMintTokenB = useCallback(async () => {
     if (!encryptedTokenB) {
       toast.error('Please encrypt tokenB first')
       return
@@ -54,14 +57,37 @@ const Mint = () => {
     try {
       const tx = await tokenBContract?.mint(
         address,
-        encryptedTokenB?.encryptedValue,
-        encryptedTokenB?.proof
+        encryptedTokenB.encryptedValue,
+        encryptedTokenB.proof
       )
-      showEtherscanTx('mint TokenB', tx.hash)
+      if (tx?.hash) {
+        showEtherscanTx('mint TokenB', tx.hash)
+      }
     } catch (error) {
-      toast.error('mint error')
+      console.error('Mint TokenB error:', error)
+      toast.error('Mint TokenB failed')
     }
-  }
+  }, [encryptedTokenB, tokenBContract, address])
+
+  const handleEncryptTokenA = useCallback(() => {
+    if (!ownerAddress) return
+    
+    encryptA({
+      userAddress: ownerAddress as `0x${string}`,
+      contractAddress: tokenAAddress,
+      amount: tokenAAmount,
+    })
+  }, [ownerAddress, encryptA, tokenAAmount])
+
+  const handleEncryptTokenB = useCallback(() => {
+    if (!ownerAddress) return
+    
+    encryptB({
+      userAddress: ownerAddress as `0x${string}`,
+      contractAddress: tokenBAddress,
+      amount: tokenBAmount,
+    })
+  }, [ownerAddress, encryptB, tokenBAmount])
 
   if (!isConnected) {
     return <div>Please connect your wallet</div>
@@ -99,20 +125,14 @@ const Mint = () => {
             <div className='flex flex-row gap-2 justify-between items-center w-full'>
               <Button
                 disabled={!ownerAddress || isEncryptingA}
-                className='w-1/2 bg-amber-500 text-white rounded-md p-2 '
-                onClick={() =>
-                  encryptA({
-                    userAddress: ownerAddress as `0x${string}`,
-                    contractAddress: tokenAAddress,
-                    amount: tokenAAmount,
-                  })
-                }
+                className='w-1/2 bg-amber-500 text-white rounded-md p-2'
+                onClick={handleEncryptTokenA}
               >
                 ENCRYPT
               </Button>
               <Button
                 disabled={!encryptedTokenA}
-                className='w-1/2  text-white rounded-md p-2 '
+                className='w-1/2 text-white rounded-md p-2'
                 onClick={handleMintTokenA}
               >
                 MINT
@@ -146,20 +166,14 @@ const Mint = () => {
             <div className='flex flex-row gap-2 justify-between items-center w-full'>
               <Button
                 disabled={!ownerAddress || isEncryptingB}
-                className='w-1/2   bg-amber-500 text-white rounded-md p-2 '
-                onClick={() =>
-                  encryptB({
-                    userAddress: ownerAddress as `0x${string}`,
-                    contractAddress: tokenBAddress,
-                    amount: tokenBAmount,
-                  })
-                }
+                className='w-1/2 bg-amber-500 text-white rounded-md p-2'
+                onClick={handleEncryptTokenB}
               >
                 ENCRYPT
               </Button>
               <Button
                 disabled={!encryptedTokenB}
-                className='w-1/2  text-white rounded-md p-2 '
+                className='w-1/2 text-white rounded-md p-2'
                 onClick={handleMintTokenB}
               >
                 MINT

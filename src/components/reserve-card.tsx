@@ -1,11 +1,11 @@
 import { useReserve } from '@/hooks/use-reserve'
 import { formatAddress } from '@/lib/format'
-
 import { useWriterContract } from '@/hooks/use-writer-contract'
 import { fheSwapAddress } from '@/lib/contract'
 import { userDecrypt } from '@/lib/fhe/user-decrypt'
 import { useMutation } from '@tanstack/react-query'
 import { ethers, type Wallet } from 'ethers'
+import { useCallback } from 'react'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -27,14 +27,17 @@ const ReserveCard = () => {
     data: decryptedTokenA,
     isPending: isDecryptingTokenA,
   } = useMutation({
-    mutationFn: async () => {
+    mutationFn: useCallback(async () => {
+      if (!reserve?.tokenA || !signer) {
+        throw new Error('Missing reserve data or signer')
+      }
       const decryptedTokenA = await userDecrypt(
-        reserve?.tokenA,
+        reserve.tokenA,
         fheSwapAddress,
         signer as Wallet
       )
       return ethers.formatUnits(decryptedTokenA, 6)
-    },
+    }, [reserve?.tokenA, signer]),
   })
 
   const {
@@ -42,14 +45,17 @@ const ReserveCard = () => {
     data: decryptedTokenB,
     isPending: isDecryptingTokenB,
   } = useMutation({
-    mutationFn: async () => {
+    mutationFn: useCallback(async () => {
+      if (!reserve?.tokenB || !signer) {
+        throw new Error('Missing reserve data or signer')
+      }
       const decryptedTokenB = await userDecrypt(
-        reserve?.tokenB,
+        reserve.tokenB,
         fheSwapAddress,
         signer as Wallet
       )
       return ethers.formatUnits(decryptedTokenB, 6)
-    },
+    }, [reserve?.tokenB, signer]),
   })
 
   return (
